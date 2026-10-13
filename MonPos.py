@@ -1,8 +1,15 @@
 import pandas as pd
 import numpy as np
+import time
+
+def Avans():
+    xls_avans=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/МО.xlsx',sheet_name='исх_данные',skiprows=1,usecols=['Номер заказа поставщику','Спецификация (сумма)','Процент авансирования'])
+   
+    return xls_avans
+
 def UnOtchAvans ():
     xls=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/6UnOtch.xlsx',sheet_name='Лист_1',skiprows=8)
-    xls_avans=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/МО.xlsx',sheet_name='исх_данные',skiprows=1)
+    xls_avans_1=Avans()
     xls['date_str'] = xls['Регистратор'].str.strip().str.split('от').str[1]
     xls['date_avans']=xls['date_str'].str.strip().str.split(' ').str[0]
 
@@ -16,7 +23,7 @@ def UnOtchAvans ():
     xls=xls.sort_values(['Заказ поставщику.Номер','date_avans'])
     xls['rollsum']=xls.groupby('Заказ поставщику.Номер')['Сумма оплаты'].cumsum()
 
-    xls_merged=pd.merge(xls,xls_avans,left_on='Заказ поставщику.Номер',right_on='Номер заказа поставщику',how='left')
+    xls_merged=pd.merge(xls,xls_avans_1,left_on='Заказ поставщику.Номер',right_on='Номер заказа поставщику',how='left')
     xls_merged['Процент авансирования']=xls_merged['Процент авансирования'].fillna(100)
 
     xls_merged['Процент авансирования дробь']=xls_merged['Процент авансирования']/100
@@ -95,22 +102,29 @@ def LWReport():
 def Escuz_date_avanse():
     escuz_orig=escuz()
     LastDateAvans=UnOtchAvans()
+    MO_avanse=Avans()
     UGO,UOO = UO()
+    
+    MO_avanse['Процент авансирования']=MO_avanse['Процент авансирования'].fillna(100)
+
     LastDatePayAvans=pd.merge(escuz_orig,LastDateAvans,left_on='Заказ поставщику.Номер',right_on='Заказ поставщику.Номер',how='left')
-    LastDatePayAvans['Расчетная дата отгрузки']=LastDatePayAvans['date_avans']+pd.to_timedelta(LastDatePayAvans['Заказ поставщику.Срок изготовления (в днях)'],unit='D')+pd.to_timedelta(LastDatePayAvans['Срок Доставки'],unit='D')
     LastDatePayAvansUgo=pd.merge(LastDatePayAvans,UGO,left_on='Заказ поставщику.Номер',right_on='Заказ поставщику',how='left')
     LastDatePayAvansUgoUo=pd.merge(LastDatePayAvansUgo,UOO,left_on='Заказ поставщику.Номер',right_on='Заказ поставщику',how='left')
+    LastDatePayAvansUgoUoAvans=pd.merge(LastDatePayAvansUgoUo,MO_avanse,left_on='Заказ поставщику.Номер',right_on='Номер заказа поставщику',how='left')
+    
+    LastDatePayAvans['Расчетная дата отгрузки']=LastDatePayAvans['date_avans']+pd.to_timedelta(LastDatePayAvans['Заказ поставщику.Срок изготовления (в днях)'],unit='D')+pd.to_timedelta(LastDatePayAvans['Срок Доставки'],unit='D')
     LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']=LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)'].fillna(0)
     LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС']=LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС'].fillna(0)
     LastDatePayAvansUgoUo['Неисполненные обязательства']=np.where(LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']-LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС']<0,0,LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']-LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС'])
-    
-    
-    
-    return LastDatePayAvansUgoUo
+    LastDatePayAvansUgoUoAvans['Процент авансирования']=LastDatePayAvansUgoUoAvans['Процент авансирования']/100
+    LastDatePayAvansUgoUoAvans['Наличие оплаты']=np.where(LastDatePayAvansUgoUoAvans['Оплачено в рыночных ценах (с НДС)']>=(LastDatePayAvansUgoUoAvans['Сумма спецификации с НДС']*LastDatePayAvansUgoUoAvans['Процент авансирования']),'Оплачено','Не оплачено')
+    return LastDatePayAvansUgoUoAvans
 
 
 if __name__ == '__main__':
+ start=time.perf_counter()
  df=Escuz_date_avanse()
 
  df.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/escuzdateavans.xlsx')
-
+ end=time.perf_counter()
+ print(f"Время работы: {end - start:.4f} сек")
