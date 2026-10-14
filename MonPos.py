@@ -112,12 +112,17 @@ def Escuz_date_avanse():
     LastDatePayAvansUgoUo=pd.merge(LastDatePayAvansUgo,UOO,left_on='Заказ поставщику.Номер',right_on='Заказ поставщику',how='left')
     LastDatePayAvansUgoUoAvans=pd.merge(LastDatePayAvansUgoUo,MO_avanse,left_on='Заказ поставщику.Номер',right_on='Номер заказа поставщику',how='left')
     
-    LastDatePayAvans['Расчетная дата отгрузки']=LastDatePayAvans['date_avans']+pd.to_timedelta(LastDatePayAvans['Заказ поставщику.Срок изготовления (в днях)'],unit='D')+pd.to_timedelta(LastDatePayAvans['Срок Доставки'],unit='D')
-    LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']=LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)'].fillna(0)
-    LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС']=LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС'].fillna(0)
-    LastDatePayAvansUgoUo['Неисполненные обязательства']=np.where(LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']-LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС']<0,0,LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']-LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС'])
+    LastDatePayAvansUgoUoAvans['Расчетная дата отгрузки']=LastDatePayAvans['date_avans']+pd.to_timedelta(LastDatePayAvans['Заказ поставщику.Срок изготовления (в днях)'],unit='D')+pd.to_timedelta(LastDatePayAvans['Срок Доставки'],unit='D')
+    LastDatePayAvansUgoUoAvans['Оплачено в рыночных ценах (с НДС)']=LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)'].fillna(0)
+    LastDatePayAvansUgoUoAvans['Отгружено поставщиком в ценах поставщика с НДС']=LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС'].fillna(0)
+    LastDatePayAvansUgoUoAvans['Неисполненные обязательства']=np.where(LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']-LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС']<0,0,LastDatePayAvansUgoUo['Оплачено в рыночных ценах (с НДС)']-LastDatePayAvansUgoUo['Отгружено поставщиком в ценах поставщика с НДС'])
     LastDatePayAvansUgoUoAvans['Процент авансирования']=LastDatePayAvansUgoUoAvans['Процент авансирования']/100
     LastDatePayAvansUgoUoAvans['Наличие оплаты']=np.where(LastDatePayAvansUgoUoAvans['Оплачено в рыночных ценах (с НДС)']>=(LastDatePayAvansUgoUoAvans['Сумма спецификации с НДС']*LastDatePayAvansUgoUoAvans['Процент авансирования']),'Оплачено','Не оплачено')
+    
+    
+    
+    
+    
     return LastDatePayAvansUgoUoAvans
 
 
