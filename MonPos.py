@@ -8,7 +8,25 @@ def Avans():
    
     return xls_avans
 
+def LWReport_coments(comment):
+    
+    if comment.strip()=="":
+        return comment
+    Lines=[line.strip() for line in comment.split('\n') if line.strip()]
+    seen=set()
+    unique_coments=[]
+    for line in Lines:
+        if ': ' in Lines:
+            comment_text=line.split(': ',1)[1]
+        else:
+            comment_text=line
 
+        if comment_text not in seen:
+            seen.add(comment_text)
+            unique_coments.append(line)
+    
+    
+    return  '\n'.join(unique_coments)
 def LWReport():
     xlsLWReport=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/3LWReport.xlsx',sheet_name='Данные')
     col_comments = []
@@ -26,9 +44,10 @@ def LWReport():
     #col_1 это список неизменяемых НАЗВАНИЙ столбцов, а также названий столбцов, в которых встречается 'Комментарии ТУ' и 'Примечание на'
     xlsLWReport['Комментарии_все'] = ''
     for i in col_comments:
-        xlsLWReport['Комментарии_все'] = xlsLWReport['Комментарии_все'] + xlsLWReport[i] + '; '
+        xlsLWReport[i]=xlsLWReport[i].fillna("")
+        xlsLWReport['Комментарии_все'] = np.where(xlsLWReport[i]=="",xlsLWReport['Комментарии_все'],xlsLWReport['Комментарии_все'] + i[-10:] +':\n'+' '+ xlsLWReport[i] + '; ' + '\n')
     #xlsLWReport.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/lwcoments.xlsx')
-    
+    #xlsLWReport['Комментарии_все']=xlsLWReport['Комментарии_все'].apply(LWReport_coments)
     return xlsLWReport 
 
 def UnOtchAvans ():
@@ -194,9 +213,9 @@ def Escuz_date_avanse():
 
 if __name__ == '__main__':
  start=time.perf_counter()
- df=Escuz_date_avanse()
+ df=LWReport()
 
- df.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/escuzdateavans.xlsx')
+ df.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/LwREP.xlsx')
  
  end=time.perf_counter()
  print(f"Время работы: {end - start:.4f} сек")
