@@ -2,7 +2,28 @@ import pandas as pd
 import numpy as np
 import time
 from datetime import datetime
+def max_comment_prim_date(columns_name):
+    comment_date_str=[]
+    prim_date_str=[]
+    for i in columns_name:
+        if ('Комментарии ТУ' in i):
+            comment_date_str.append(i[-10:].strip())
+        if ('Примечание на' in i):
+            prim_date_str.append(i[-10:].strip())
+    
+    #print(comment_date_str)
+    print(prim_date_str)
+    comment_date=pd.to_datetime(comment_date_str,format='%d.%m.%Y')
+    prim_date=pd.to_datetime(prim_date_str,'%d.%m.%Y')
+   # print(comment_date)
+    print(prim_date)
+    comment_date_cur=comment_date.max() + pd.DateOffset(days=7)
+    
+    prim_date_cur=prim_date.max() + pd.DateOffset(days=7)
 
+    return comment_date_cur.strftime('%d.%m.%Y') , prim_date_cur.strftime('%d.%m.%Y')
+
+    
 def Avans():
     xls_avans=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/МО.xlsx',sheet_name='исх_данные',skiprows=1,usecols=['Номер заказа поставщику','Спецификация (сумма)','Процент авансирования'])
    
@@ -37,15 +58,17 @@ def LWReport():
     xlsLWReport=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/3LWReport.xlsx',sheet_name='Данные')
     col_comments = []
     col_primets = []
+    
     col_1 = ['Заказ поставщику.Номер', 'Планируемая дата отгрузки ТУ', '% авансирования', 'Вина поставщика\nДА/НЕТ', 'Наличие в справке', 'Вина поставщика\nДА/НЕТ акт2']
     for i in xlsLWReport.columns:
         if ('Комментарии ТУ' in i) or ('Примечание на' in i):
             col_1.append(i)
         if ('Комментарии ТУ' in i):
             col_comments.append(i)
+            
         if ('Примечание на' in i):
             col_primets.append(i)
-
+    
     xlsLWReport = xlsLWReport[col_1]
     #col_1 это список неизменяемых НАЗВАНИЙ столбцов, а также названий столбцов, в которых встречается 'Комментарии ТУ' и 'Примечание на'
     xlsLWReport['Комментарии_все'] = ''
@@ -137,6 +160,7 @@ def Escuz_date_avanse():
     UGO,UOO = UO()
     today=pd.Timestamp.today().normalize()
     
+    
     MO_avanse['Процент авансирования']=MO_avanse['Процент авансирования'].fillna(100)
 
     LastDatePayAvans=pd.merge(escuz_orig,LastDateAvans,left_on='Заказ поставщику.Номер',right_on='Заказ поставщику.Номер',how='left')
@@ -164,8 +188,12 @@ def Escuz_date_avanse():
 
     ]
     choices_prim=['Менее миллиона по спецификации','Поставлено по данным есцуз','Не оплачено','Отгружено по всем показателям','Отгружено более 100 процентов','Расчетный срок отгрузки не наступил','Крайняя дата платежа ок']
-    LastDatePayAvansUgoUoAvans["примечание"]=np.select(conditions_prim,choices_prim,"")
-    colmuns_sample=[
+    date_cur_comment,date_cur_prim=max_comment_prim_date(LastDatePayAvansUgoUoAvans.columns)
+    
+    LastDatePayAvansUgoUoAvans[f"Примечание на {date_cur_prim}"]=""
+    LastDatePayAvansUgoUoAvans["Примечание"]=np.select(conditions_prim,choices_prim,"")
+    LastDatePayAvansUgoUoAvans[f'Комментарии ТУ Актуальные на {date_cur_comment}']=''
+    columns_sample=[
     "Заказ поставщику.Номер",
     "Объект строительства.Группа",
     "Заказ поставщику.Объект строительства",
@@ -205,6 +233,7 @@ def Escuz_date_avanse():
     "Вина поставщика\nДА/НЕТ",
     "Наличие в справке",
     "Вина поставщика\nДА/НЕТ акт2",
+    f'Комментарии ТУ Актуальные на {date_cur_comment}',
     "Комментарии ТУ Актуальные на 12.12.2025",
     "Комментарии ТУ Актуальные на 05.12.2025",
     "Комментарии ТУ Актуальные на 28.11.2025",
@@ -212,17 +241,18 @@ def Escuz_date_avanse():
     "Примечание на на 28.11.2025",
     "Примечание на на 05.12.2025",
     "Примечание на 12.12.2025",
-    "примечание"
+    f"Примечание",
+    f"Примечание на {date_cur_prim}"
 ]
 
-    return LastDatePayAvansUgoUoAvans[colmuns_sample]
+    return LastDatePayAvansUgoUoAvans[columns_sample]
 
 
 if __name__ == '__main__':
  start=time.perf_counter()
- df=LWReport()
+ df=Escuz_date_avanse()
 
- df.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/LwREP.xlsx')
+ df.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/escuz.xlsx')
  
  end=time.perf_counter()
  print(f"Время работы: {end - start:.4f} сек")
