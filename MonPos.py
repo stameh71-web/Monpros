@@ -12,21 +12,27 @@ def LWReport_coments(comment):
     
     if comment.strip()=="":
         return comment
-    Lines=[line.strip() for line in comment.split('\n') if line.strip()]
-    seen=set()
-    unique_coments=[]
-    for line in Lines:
-        if ': ' in Lines:
-            comment_text=line.split(': ',1)[1]
-        else:
-            comment_text=line
+    Date_comment=[]
+    Comment_lw=[]
+    lines=comment.split('; ')
+    for i in lines:
+        Date_comment.append(i[:10].strip())
+        Comment_lw.append(i[11:].strip())
 
-        if comment_text not in seen:
-            seen.add(comment_text)
-            unique_coments.append(line)
-    
-    
-    return  '\n'.join(unique_coments)
+        
+
+    df=pd.DataFrame({'date_str': Date_comment,'Comment':Comment_lw})
+    df['date']=pd.to_datetime(df['date_str'],format='%d.%m.%Y') 
+    df_grouped=df.groupby('Comment',sort=False)['date'].agg(['min','max']).reset_index()
+    condition=df_grouped['max']!=df_grouped['min']
+    df_grouped['Период']=np.where(condition, df_grouped['min'].dt.strftime('%d.%m.%Y') + ' - ' + df_grouped['max'].dt.strftime('%d.%m.%Y'),df_grouped['max'].dt.strftime('%d.%m.%Y'))
+    df_clean=df_grouped.dropna(subset=['Период'])
+    df_clean_rear=df_clean[['Период','Comment']]
+    coments_itog=[]
+    for i,j in df_clean_rear.iterrows():
+        coments_itog.append(f"{j['Период']}: {j['Comment']}")
+    res='\n'.join(coments_itog)
+    return  res
 def LWReport():
     xlsLWReport=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/3LWReport.xlsx',sheet_name='Данные')
     col_comments = []
@@ -45,9 +51,10 @@ def LWReport():
     xlsLWReport['Комментарии_все'] = ''
     for i in col_comments:
         xlsLWReport[i]=xlsLWReport[i].fillna("")
-        xlsLWReport['Комментарии_все'] = np.where(xlsLWReport[i]=="",xlsLWReport['Комментарии_все'],xlsLWReport['Комментарии_все'] + i[-10:] +':\n'+' '+ xlsLWReport[i] + '; ' + '\n')
+        xlsLWReport['Комментарии_все'] = np.where(xlsLWReport[i]=="",xlsLWReport['Комментарии_все'],xlsLWReport['Комментарии_все'] + i[-10:] +' '+ xlsLWReport[i] + '; ' )
     #xlsLWReport.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/lwcoments.xlsx')
-    #xlsLWReport['Комментарии_все']=xlsLWReport['Комментарии_все'].apply(LWReport_coments)
+    xlsLWReport['Комментарии_все']=xlsLWReport['Комментарии_все'].apply(LWReport_coments)
+    
     return xlsLWReport 
 
 def UnOtchAvans ():
