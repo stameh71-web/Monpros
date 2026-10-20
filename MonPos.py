@@ -55,7 +55,10 @@ def LWReport_melt(prefix='Примечание на'):
     xlsLWReport=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/3LWReport.xlsx',sheet_name='Данные')
     col_1 = ['Заказ поставщику.Номер', 'Планируемая дата отгрузки ТУ',  'Вина поставщика\nДА/НЕТ акт2']
     col_2=[]
+    col_skip=["Комментарии_все",'Примечания_все']
     for i in xlsLWReport.columns:
+        if i in col_skip:
+            continue
         if (prefix in i):
             col_2.append(i)
     report_melted=xlsLWReport.melt(col_1,col_2,"Дата","Текст" )
@@ -72,7 +75,7 @@ def LWReport_melt(prefix='Примечание на'):
     report_melted_grouped_sorted=report_melted_grouped.sort_values(by="max",ascending=False)
     report_melted_grouped_sorted=report_melted_grouped_sorted.reset_index(drop=True)
     report_melted_grouped_sorted["Период"]=np.where(report_melted_grouped_sorted['min']==report_melted_grouped_sorted["max"],report_melted_grouped_sorted['max'].dt.strftime('%d.%m.%Y')+": "+ report_melted_grouped_sorted['Текст'],report_melted_grouped_sorted['min'].dt.strftime('%d.%m.%Y')+' - '+ report_melted_grouped_sorted['max'].dt.strftime('%d.%m.%Y')+': ' + report_melted_grouped_sorted['Текст'])
-    report_melted_grouped_concat=report_melted_grouped_sorted.groupby('Заказ поставщику.Номер')['Период'].agg(";\n".join)
+    report_melted_grouped_concat=report_melted_grouped_sorted.groupby('Заказ поставщику.Номер')['Период'].agg(";\n".join).reset_index()
 
     
     
@@ -96,15 +99,15 @@ def LWReport():
     
     xlsLWReport = xlsLWReport[col_1]
     #col_1 это список неизменяемых НАЗВАНИЙ столбцов, а также названий столбцов, в которых встречается 'Комментарии ТУ' и 'Примечание на'
-    xlsLWReport['Комментарии_все'] = ''
+    #xlsLWReport['Комментарии_все'] = ''
     
-    for i in col_comments:
-        xlsLWReport[i]=xlsLWReport[i].fillna("")
-        xlsLWReport['Комментарии_все'] = np.where(xlsLWReport[i]=="",xlsLWReport['Комментарии_все'],xlsLWReport['Комментарии_все'] + i[-10:] +' '+ xlsLWReport[i] + '; ' )
+    #for i in col_comments:
+     #   xlsLWReport[i]=xlsLWReport[i].fillna("")
+      #  xlsLWReport['Комментарии_все'] = np.where(xlsLWReport[i]=="",xlsLWReport['Комментарии_все'],xlsLWReport['Комментарии_все'] + i[-10:] +' '+ xlsLWReport[i] + '; ' )
     #xlsLWReport.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/lwcoments.xlsx')
     
 
-    xlsLWReport['Комментарии_все']=xlsLWReport['Комментарии_все'].apply(LWReport_coments)
+    #xlsLWReport['Комментарии_все']=xlsLWReport['Комментарии_все'].apply(LWReport_coments)
    
     return xlsLWReport 
 
@@ -157,8 +160,9 @@ def escuz():
     FIO_TU=pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/FIO_TU.xlsx',sheet_name='ФИО-ТУ')
     LWR=LWReport()
     LWR_prim_concat=LWReport_melt()
+    LWR_prim_concat=LWR_prim_concat.rename(columns={'Период':'Примечания_все'})
     LWR_comment_concat=LWReport_melt('Комментарии')
-
+    LWR_comment_concat=LWR_comment_concat.rename(columns={'Период':'Комментарии_все'})
     ESCUZ_4['Объект строительства.Группа']=ESCUZ_4.groupby('Заказ поставщику.Номер' )['Объект строительства.Группа'].transform(lambda x: x.ffill().bfill())
     ESCUZ_4_gr=ESCUZ_4.groupby(['Заказ поставщику.Номер','Объект строительства.Группа','Контрагент','№ спецификации','Заказ поставщику.Дата Спецификации','Заказ поставщику.Подразделение организации','Заказ поставщику.Ответственный','Заказ поставщику.Дата поступления','Заказ поставщику.Срок изготовления (в днях)','Заказ поставщику.Оплата','Заказ поставщику.Прибыло','Заказ поставщику.Условие поставки','Заказ поставщику.Объект строительства','Заказ поставщику.Дата отгрузки'],dropna=False)[['Сметная стоимость с НДС','Сумма спецификации с НДС','Оплачено в рыночных ценах (с НДС)','Отгружено поставщиком в ценах поставщика с НДС','Поставлено поставщиком в ценах поставщика с НДС','Количество по спец. ЕНСИ','Количество отгружено в ед. изм. ЕНСИ']].sum().reset_index()
     ESCUZ_GR_TU=pd.merge(ESCUZ_4_gr,FIO_TU,left_on='Заказ поставщику.Ответственный',right_on='Специалист по закупкам',how='left')
@@ -271,6 +275,7 @@ def Escuz_date_avanse():
     "Комментарии ТУ Актуальные на 05.12.2025",
     "Комментарии ТУ Актуальные на 28.11.2025",
     "Комментарии_все",
+    "Примечания_все",
     
     "Примечание на на 28.11.2025",
     "Примечание на на 05.12.2025",
@@ -283,7 +288,7 @@ def Escuz_date_avanse():
 
 if __name__ == '__main__':
  start=time.perf_counter()
- df=escuz()
+ df=Escuz_date_avanse()
 
  df.to_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/melt_test.xlsx')
  
