@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 import time
 from datetime import datetime
+from pathlib import Path 
 
+BASE_DIR= Path(r"C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки")
 
 def max_comment_prim_date(columns_name): # Вспомогательная функция, возвращает актуальную отчетную дату из наименований столбцов
     comment_date_str = []
@@ -17,15 +19,14 @@ def max_comment_prim_date(columns_name): # Вспомогательная фун
 
 
 def Avans():# Возвращает таблицу номер заказа - процент аванса
-    xls_avans = pd.read_excel(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/МО.xlsx', sheet_name='исх_данные',
-                              skiprows=1, usecols=['Номер заказа поставщику', 'Спецификация (сумма)', 'Процент авансирования'])
+    xls_avans = pd.read_excel(BASE_DIR/'МО.xlsx', sheet_name='исх_данные',
+                               usecols=['Номер заказа поставщику', 'Спецификация (сумма)', 'Процент авансирования'])
 
     return xls_avans
 
 
 def LWReport_melt(prefix='Примечание на'): # Функция склеивает коментарии или примечания из отчета прошлой недели и групирует их в нужном формате
-    xlsLWReport = pd.read_excel(
-        r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/3LWReport.xlsx', sheet_name='Данные')
+    xlsLWReport = pd.read_excel(BASE_DIR/'3LWReport.xlsx', sheet_name='Данные')
     col_1 = ['Заказ поставщику.Номер', 'Планируемая дата отгрузки ТУ',
              'Вина поставщика\nДА/НЕТ акт2']
     col_2 = []
@@ -62,8 +63,7 @@ def LWReport_melt(prefix='Примечание на'): # Функция скле
 
 
 def LWReport(): # функция забирает необходимые столбцы с именами из отчета прошлой недели
-    xlsLWReport = pd.read_excel(
-        r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/3LWReport.xlsx', sheet_name='Данные')
+    xlsLWReport = pd.read_excel(BASE_DIR/'3LWReport.xlsx', sheet_name='Данные')
     col_comments = []
     col_primets = []
 
@@ -84,8 +84,7 @@ def LWReport(): # функция забирает необходимые сто�
 
 
 def UnOtchAvans():# функция рассчитаыает дату платежа по авансу
-    xls = pd.read_excel(
-        r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/6UnOtch.xlsx', sheet_name='Лист_1', skiprows=8)
+    xls = pd.read_excel(BASE_DIR/'6UnOtch.xlsx', sheet_name='Лист_1', skiprows=8)
     xls_avans_1 = Avans()
     xls['date_str'] = xls['Регистратор'].str.strip().str.split('от').str[1]
     xls['date_avans'] = xls['date_str'].str.strip().str.split(' ').str[0]
@@ -119,8 +118,7 @@ def UnOtchAvans():# функция рассчитаыает дату плате�
 
 
 def UO(): # Функция возвращает дату последнего уведомления об отгруке и дату последнего уведомления об готовности к отгрузке
-    xls = pd.read_excel(
-        r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/1UO.xlsx', sheet_name='Лист_1', skiprows=7)
+    xls = pd.read_excel(BASE_DIR/'1UO.xlsx', sheet_name='Лист_1', skiprows=7)
     xls_drop = xls[~xls['Заказ поставщику'].isna()].reset_index(drop=True)
     xls_drop = xls_drop.iloc[:-1]
     xls_drop['Заказ поставщику'] = xls_drop['Заказ поставщику'].str[29:40]
@@ -142,10 +140,8 @@ def UO(): # Функция возвращает дату последнего у
 
 
 def escuz(): # первый начальный этап сборки отчета.
-    ESCUZ_4 = pd.read_excel(
-        r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/escuzdupl.xlsx', sheet_name='Лист_1')
-    FIO_TU = pd.read_excel(
-        r'C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки/FIO_TU.xlsx', sheet_name='ФИО-ТУ')
+    ESCUZ_4 = pd.read_excel(BASE_DIR/'escuzdupl.xlsx', sheet_name='Лист_1',skiprows=5)
+    FIO_TU = pd.read_excel(BASE_DIR/'FIO_TU.xlsx', sheet_name='ФИО-ТУ')
     LWR = LWReport()
     LWR_prim_concat = LWReport_melt()
     LWR_prim_concat = LWR_prim_concat.rename(
@@ -253,6 +249,13 @@ def Escuz_final(): # Финальный этап сборки отчета
         conditions_prim, choices_prim, "")
     # LastDatePayAvansUgoUoAvans["Примечание"]=np.select(conditions_prim,choices_prim,"")
     LastDatePayAvansUgoUoAvans[f'Комментарии ТУ Актуальные на {date_cur_comment}'] = ''
+    col_prim_columns_name=[]
+    col_coment_columns_name=[]
+    for i in LastDatePayAvansUgoUoAvans.columns:
+        if ("Комментарии ТУ") in i:
+            col_coment_columns_name.append(i)
+        if ("Примечание на") in i:
+            col_prim_columns_name.append(i)
 
     columns_sample = [
         "Заказ поставщику.Номер",
@@ -295,15 +298,11 @@ def Escuz_final(): # Финальный этап сборки отчета
         "Наличие в справке",
         "Вина поставщика\nДА/НЕТ акт2",
         f'Комментарии ТУ Актуальные на {date_cur_comment}',
-        "Комментарии ТУ Актуальные на 12.12.2025",
-        "Комментарии ТУ Актуальные на 05.12.2025",
-        "Комментарии ТУ Актуальные на 28.11.2025",
+        *col_coment_columns_name,
         "Комментарии_все",
         "Примечания_все",
 
-        "Примечание на на 28.11.2025",
-        "Примечание на на 05.12.2025",
-        "Примечание на 12.12.2025",
+        *col_prim_columns_name,
         f"Примечание на {date_cur_comment}"
     ]
 
