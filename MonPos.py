@@ -302,8 +302,8 @@ def Escuz_final(): # Финальный этап сборки отчета
         "Комментарии_все",
         "Примечания_все",
 
-        *col_prim_columns_name,
-        f"Примечание на {date_cur_comment}"
+        *col_prim_columns_name
+        
     ]
 
     return LastDatePayAvansUgoUoAvans[columns_sample]
