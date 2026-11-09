@@ -3,10 +3,13 @@ import numpy as np
 import time
 from datetime import datetime
 from pathlib import Path 
+import sqlite3
 
 BASE_DIR= Path(r"C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки")
+Sql_Base_dir=Path(r"C:/Users/Samski/metabase-data/MonPos.db")
 
 def max_comment_prim_date(columns_name): # Вспомогательная функция, возвращает актуальную отчетную дату из наименований столбцов
+    start = time.perf_counter() 
     comment_date_str = []
 
     for i in columns_name:
@@ -14,19 +17,24 @@ def max_comment_prim_date(columns_name): # Вспомогательная фун
             comment_date_str.append(i[-10:].strip())
     comment_date = pd.to_datetime(comment_date_str, format='%d.%m.%Y')
     comment_date_cur = comment_date.max() + pd.DateOffset(days=7)
-
+    end = time.perf_counter() 
+    print(f"Время работы max_comment_prim_date: {end - start:.4f} сек")
     return comment_date_cur.strftime('%d.%m.%Y')
 
 
 def Avans():# Возвращает таблицу номер заказа - процент аванса
+    start = time.perf_counter() 
     xls_avans = pd.read_excel(BASE_DIR/'МО.xlsx', sheet_name='исх_данные',
                                usecols=['Номер заказа поставщику', 'Спецификация (сумма)', 'Процент авансирования'])
-
+    end = time.perf_counter() 
+    print(f"Время работы avans: {end - start:.4f} сек")
     return xls_avans
 
 
-def LWReport_melt(prefix='Примечание на'): # Функция склеивает коментарии или примечания из отчета прошлой недели и групирует их в нужном формате
-    xlsLWReport = pd.read_excel(BASE_DIR/'3LWReport.xlsx', sheet_name='Данные')
+def LWReport_melt(zakaz_melt,prefix='Примечание на'): # Функция склеивает коментарии или примечания из отчета прошлой недели и групирует их в нужном формате
+    start = time.perf_counter() 
+    xlsLWReport_pre = pd.read_excel(BASE_DIR/'3LWReport.xlsx', sheet_name='Данные')
+    xlsLWReport=xlsLWReport_pre[xlsLWReport_pre['Заказ поставщику.Номер'].isin(zakaz_melt)]
     col_1 = ['Заказ поставщику.Номер', 'Планируемая дата отгрузки ТУ',
              'Вина поставщика\nДА/НЕТ акт2']
     col_2 = []
@@ -58,11 +66,13 @@ def LWReport_melt(prefix='Примечание на'): # Функция скле
         '%d.%m.%Y')+": " + report_melted_grouped_sorted['Текст'], report_melted_grouped_sorted['min'].dt.strftime('%d.%m.%Y')+' - ' + report_melted_grouped_sorted['max'].dt.strftime('%d.%m.%Y')+': ' + report_melted_grouped_sorted['Текст'])
     report_melted_grouped_concat = report_melted_grouped_sorted.groupby(
         'Заказ поставщику.Номер')['Период'].agg(";\n".join).reset_index()
-
+    end = time.perf_counter() 
+    print(f"Время работы melt: {end - start:.4f} сек")
     return report_melted_grouped_concat
 
 
 def LWReport(): # функция забирает необходимые столбцы с именами из отчета прошлой недели
+    start = time.perf_counter()
     xlsLWReport = pd.read_excel(BASE_DIR/'3LWReport.xlsx', sheet_name='Данные')
     col_comments = []
     col_primets = []
@@ -79,11 +89,13 @@ def LWReport(): # функция забирает необходимые сто�
             col_primets.append(i)
 
     xlsLWReport = xlsLWReport[col_1]
-   
+    end = time.perf_counter() 
+    print(f"Время работы lwreport: {end - start:.4f} сек")
     return xlsLWReport
 
 
 def UnOtchAvans():# функция рассчитаыает дату платежа по авансу
+    start = time.perf_counter()
     xls = pd.read_excel(BASE_DIR/'6UnOtch.xlsx', sheet_name='Лист_1', skiprows=8)
     xls_avans_1 = Avans()
     xls['date_str'] = xls['Регистратор'].str.strip().str.split('от').str[1]
@@ -113,11 +125,13 @@ def UnOtchAvans():# функция рассчитаыает дату плате�
                                  == 'Аванс оплачен']
     xls_merges_gr = xls_merges_filt.groupby('Заказ поставщику.Номер')[
         'date_avans'].min().reset_index()
-
+    end = time.perf_counter() 
+    print(f"Время работы lwreport: {end - start:.4f} сек")
     return xls_merges_gr
 
 
 def UO(): # Функция возвращает дату последнего уведомления об отгруке и дату последнего уведомления об готовности к отгрузке
+    start = time.perf_counter()
     xls = pd.read_excel(BASE_DIR/'1UO.xlsx', sheet_name='Лист_1', skiprows=7)
     xls_drop = xls[~xls['Заказ поставщику'].isna()].reset_index(drop=True)
     xls_drop = xls_drop.iloc[:-1]
@@ -134,21 +148,18 @@ def UO(): # Функция возвращает дату последнего у
                                   == 'Извещение о готовности']
     xls_drop_gr_UOO = xls_drop_gr[xls_drop_gr['Тип уведомления']
                                   == 'Извещение об отгрузке']
-   
-
+    end = time.perf_counter() 
+    print(f"Время работы UO: {end - start:.4f} сек")
+    
     return xls_drop_gr_UGO, xls_drop_gr_UOO
 
 
 def escuz(): # первый начальный этап сборки отчета.
+    start = time.perf_counter()
     ESCUZ_4 = pd.read_excel(BASE_DIR/'escuzdupl.xlsx', sheet_name='Лист_1',skiprows=5)
     FIO_TU = pd.read_excel(BASE_DIR/'FIO_TU.xlsx', sheet_name='ФИО-ТУ')
     LWR = LWReport()
-    LWR_prim_concat = LWReport_melt()
-    LWR_prim_concat = LWR_prim_concat.rename(
-        columns={'Период': 'Примечания_все'})
-    LWR_comment_concat = LWReport_melt('Комментарии')
-    LWR_comment_concat = LWR_comment_concat.rename(
-        columns={'Период': 'Комментарии_все'})
+
     ESCUZ_4['Объект строительства.Группа'] = ESCUZ_4.groupby('Заказ поставщику.Номер')[
         'Объект строительства.Группа'].transform(lambda x: x.ffill().bfill())
     ESCUZ_4_gr = ESCUZ_4.groupby(['Заказ поставщику.Номер', 'Объект строительства.Группа', 'Контрагент', '№ спецификации', 'Заказ поставщику.Дата Спецификации', 'Заказ поставщику.Подразделение организации', 'Заказ поставщику.Ответственный', 'Заказ поставщику.Дата поступления', 'Заказ поставщику.Срок изготовления (в днях)', 'Заказ поставщику.Оплата', 'Заказ поставщику.Прибыло', 'Заказ поставщику.Условие поставки',
@@ -181,16 +192,18 @@ def escuz(): # первый начальный этап сборки отчет�
         ESCUZ_GR_TU_comments['Количество по спец. ЕНСИ'] != 0, ESCUZ_GR_TU_comments['Количество отгружено в ед. изм. ЕНСИ']/ESCUZ_GR_TU_comments['Количество по спец. ЕНСИ'], 0)
     ESCUZ_GR_TU_comments['Процент отгрузки по есцуз'] = np.where(
         ESCUZ_GR_TU_comments['Сумма спецификации с НДС'] != 0, ESCUZ_GR_TU_comments['Отгружено поставщиком в ценах поставщика с НДС']/ESCUZ_GR_TU_comments['Сумма спецификации с НДС'], 0)
-    ESCUZ_GR_TU_comments_prim = pd.merge(ESCUZ_GR_TU_comments, LWR_prim_concat,
-                                         left_on='Заказ поставщику.Номер', right_on='Заказ поставщику.Номер', how='left')
-    ESCUZ_GR_TU_comments_prim_comm = pd.merge(ESCUZ_GR_TU_comments_prim, LWR_comment_concat,
-                                              left_on='Заказ поставщику.Номер', right_on='Заказ поставщику.Номер', how='left')
+   # ESCUZ_GR_TU_comments_prim = pd.merge(ESCUZ_GR_TU_comments, LWR_prim_concat,
+    #                                     left_on='Заказ поставщику.Номер', right_on='Заказ поставщику.Номер', how='left')
+    #ESCUZ_GR_TU_comments_prim_comm = pd.merge(ESCUZ_GR_TU_comments_prim, LWR_comment_concat,
+     #                                         left_on='Заказ поставщику.Номер', right_on='Заказ поставщику.Номер', how='left')
 
-
-    return ESCUZ_GR_TU_comments_prim_comm
+    end = time.perf_counter() 
+    print(f"Время работы escuz1: {end - start:.4f} сек")
+    return ESCUZ_GR_TU_comments
 
 
 def Escuz_final(): # Финальный этап сборки отчета
+    start = time.perf_counter()
     escuz_orig = escuz()
     LastDateAvans = UnOtchAvans()
     MO_avanse = Avans()
@@ -226,6 +239,9 @@ def Escuz_final(): # Финальный этап сборки отчета
         LastDatePayAvansUgoUoAvans['Неисполненные обязательства'] < 100, 'Неисполненные обязательства отвсутсвуют', 'Наличие неисполненных обязательств')
     LastDatePayAvansUgoUoAvans['Факт просрочки отгрузки'] = np.where(
         LastDatePayAvansUgoUoAvans['Расчетная дата отгрузки'] > today, 'Не просрочено', 'Просрочено')
+    date_cur_comment = max_comment_prim_date(
+        LastDatePayAvansUgoUoAvans.columns)
+
     conditions_prim = [
         LastDatePayAvansUgoUoAvans['Сумма спецификации с НДС'] < 1000000,
         LastDatePayAvansUgoUoAvans['Заказ поставщику.Прибыло'] == 'Прибыло',
@@ -237,16 +253,34 @@ def Escuz_final(): # Финальный этап сборки отчета
         ((LastDatePayAvansUgoUoAvans['Расчетная дата отгрузки'] > (today + pd.DateOffset(
             months=2))) & (LastDatePayAvansUgoUoAvans['Расчетная дата отгрузки'].notna())),
         ((today <= LastDatePayAvansUgoUoAvans['date_avans']+pd.DateOffset(
-            days=20)) & (LastDatePayAvansUgoUoAvans['date_avans'].notna()))
+            days=20)) & (LastDatePayAvansUgoUoAvans['date_avans'].notna())),
+        LastDatePayAvansUgoUoAvans["Вина поставщика\nДА/НЕТ акт2"]=='ДА',
+        LastDatePayAvansUgoUoAvans['Наличие оплаты']=='Не оплачено',
+        LastDatePayAvansUgoUoAvans['Наличие неисполненных обязательств']=='Неисполненные обязательства отвсутсвуют',
+        LastDatePayAvansUgoUoAvans['Факт просрочки отгрузки']=='Не просрочено',
+        LastDatePayAvansUgoUoAvans[f"Примечание на {(pd.to_datetime(date_cur_comment,dayfirst=True)-pd.DateOffset(days=7)).strftime('%d.%m.%Y')}"].isin(['Большой процент отгрузки', 'Имеется УГО','Аннулирование потребности','Отгружено (ТВ)','Отгружено','Приостановка объекта строительства','Убрать из реестра. Решение Осипкина А.В.','Убрать. Решение Мантуша'])
 
+#- pd.DateOffset(days=7)
     ]
     choices_prim = ['Менее миллиона по спецификации', 'Поставлено по данным есцуз', 'Не оплачено', 'Отгружено по всем показателям',
-                    'Отгружено более 100 процентов', 'Расчетный срок отгрузки не наступил', 'Крайняя дата платежа ок']
-    date_cur_comment = max_comment_prim_date(
-        LastDatePayAvansUgoUoAvans.columns)
+                    'Отгружено более 100 процентов', 'Расчетный срок отгрузки не наступил', 'Крайняя дата платежа ок','Запросить ТУ','Аванс не оплачен', 
+                    'Неисполненные обязательства отвсутсвуют','Не просрочено' ,LastDatePayAvansUgoUoAvans[f"Примечание на {(pd.to_datetime(date_cur_comment, dayfirst=True)-pd.DateOffset(days=7)).strftime('%d.%m.%Y')}"]]
 
+    
     LastDatePayAvansUgoUoAvans[f"Примечание на {date_cur_comment}"] = np.select(
         conditions_prim, choices_prim, "")
+
+    zakaz_empty_prim=LastDatePayAvansUgoUoAvans[f"Примечание на {date_cur_comment}"]==""
+    zakaz_for_melt=LastDatePayAvansUgoUoAvans.loc[zakaz_empty_prim,'Заказ поставщику.Номер']
+
+    LWR_prim_concat = LWReport_melt(zakaz_for_melt,'Примечание на')
+    LWR_prim_concat = LWR_prim_concat.rename(
+        columns={'Период': 'Примечания_все'})
+    LWR_comment_concat = LWReport_melt(zakaz_for_melt,'Комментарии')
+    LWR_comment_concat = LWR_comment_concat.rename(
+        columns={'Период': 'Комментарии_все'})
+    LastDatePayAvansUgoUoAvans=LastDatePayAvansUgoUoAvans.merge(LWR_prim_concat,on='Заказ поставщику.Номер',how='left')
+    LastDatePayAvansUgoUoAvans=LastDatePayAvansUgoUoAvans.merge(LWR_comment_concat,on='Заказ поставщику.Номер',how='left')
     # LastDatePayAvansUgoUoAvans["Примечание"]=np.select(conditions_prim,choices_prim,"")
     LastDatePayAvansUgoUoAvans[f'Комментарии ТУ Актуальные на {date_cur_comment}'] = ''
     col_prim_columns_name=[]
@@ -256,7 +290,10 @@ def Escuz_final(): # Финальный этап сборки отчета
             col_coment_columns_name.append(i)
         if ("Примечание на") in i:
             col_prim_columns_name.append(i)
+    col_coment_columns_name.insert(0,col_coment_columns_name.pop())
 
+    LastDatePayAvansUgoUoAvans = LastDatePayAvansUgoUoAvans.rename(
+        columns={"Вина поставщика\nДА/НЕТ акт2": "Вина поставщика ДА/НЕТ акт2"})
     columns_sample = [
         "Заказ поставщику.Номер",
         "Объект строительства.Группа",
@@ -296,8 +333,8 @@ def Escuz_final(): # Финальный этап сборки отчета
         "% авансирования",
         "Вина поставщика\nДА/НЕТ",
         "Наличие в справке",
-        "Вина поставщика\nДА/НЕТ акт2",
-        f'Комментарии ТУ Актуальные на {date_cur_comment}',
+        "Вина поставщика ДА/НЕТ акт2",
+        #f'Комментарии ТУ Актуальные на {date_cur_comment}',
         *col_coment_columns_name,
         "Комментарии_все",
         "Примечания_все",
@@ -305,16 +342,30 @@ def Escuz_final(): # Финальный этап сборки отчета
         *col_prim_columns_name
         
     ]
+    end = time.perf_counter() 
+    print(f"Время работы escuzfinal: {end - start:.4f} сек")
 
     return LastDatePayAvansUgoUoAvans[columns_sample]
 
 
 if __name__ == '__main__':
-    start = time.perf_counter()
+    start = time.perf_counter() 
     df = Escuz_final()
 
     df.to_excel(
         r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/melt_test.xlsx')
+    end = time.perf_counter()
+    print(f"Время работы: {end - start:.4f} сек")
 
+    start = time.perf_counter()
+    conn=sqlite3.connect(Sql_Base_dir)
+    df.to_sql(
+        name='MonPos',
+        con=conn,
+        if_exists='replace',
+        index=False
+
+    )
+    conn.close()
     end = time.perf_counter()
     print(f"Время работы: {end - start:.4f} сек")
