@@ -56,19 +56,35 @@ def LWReport_melt(zakaz_melt,prefix='Примечание на'): # Функци
 
     report_melted = report_melted.dropna(subset="Текст")
     report_melted = report_melted[report_melted['Текст'] != ""]
-    report_melted_grouped = report_melted.groupby(['Заказ поставщику.Номер', 'Текст'])[
-        'Дата'].agg(['min', 'max', 'count']).reset_index()
-    report_melted_grouped_sorted = report_melted_grouped.sort_values(
-        by="max", ascending=False)
-    report_melted_grouped_sorted = report_melted_grouped_sorted.reset_index(
-        drop=True)
-    report_melted_grouped_sorted["Период"] = np.where(report_melted_grouped_sorted['min'] == report_melted_grouped_sorted["max"], report_melted_grouped_sorted['max'].dt.strftime(
-        '%d.%m.%Y')+": " + report_melted_grouped_sorted['Текст'], report_melted_grouped_sorted['min'].dt.strftime('%d.%m.%Y')+' - ' + report_melted_grouped_sorted['max'].dt.strftime('%d.%m.%Y')+': ' + report_melted_grouped_sorted['Текст'])
-    report_melted_grouped_concat = report_melted_grouped_sorted.groupby(
-        'Заказ поставщику.Номер')['Период'].agg(";\n".join).reset_index()
+    report_melted=report_melted.sort_values(['Заказ поставщику.Номер','Дата']).reset_index(drop=True)
+    report_melted['Пред_текст']=report_melted.groupby('Заказ поставщику.Номер')['Текст'].shift(1)
+    report_melted['Новый остров?']= ((report_melted['Текст']!=report_melted['Пред_текст']) | report_melted['Пред_текст'].isna())
+    report_melted['ID острова']=report_melted['Новый остров?'].cumsum()
+    report_melted_gr=report_melted.groupby(['Заказ поставщику.Номер','Текст','ID острова'])['Дата'].agg(['min','max']).reset_index()
+    report_melted_gr=report_melted_gr.sort_values(by=['Заказ поставщику.Номер','max'],ascending=[True,False]).reset_index(drop=True)
+    report_melted_gr['Период']=np.where(
+    
+        report_melted_gr['min']==report_melted_gr['max'],
+        report_melted_gr['max'].dt.strftime('%d.%m.%Y')+": " + report_melted_gr['Текст'], 
+        report_melted_gr['min'].dt.strftime('%d.%m.%Y')+' - ' + report_melted_gr['max'].dt.strftime('%d.%m.%Y')+': ' + report_melted_gr['Текст']                                
+                                                                    
+                                        )
+
+    report_melted_gr_concat=report_melted_gr.groupby('Заказ поставщику.Номер')['Период'].agg(";\n".join).reset_index()
+    # report_melted_grouped = report_melted.groupby(['Заказ поставщику.Номер', 'Текст'])[
+    #     'Дата'].agg(['min', 'max', 'count']).reset_index()
+    # report_melted_grouped_sorted = report_melted_grouped.sort_values(
+    #     by="max", ascending=False)
+    # report_melted_grouped_sorted = report_melted_grouped_sorted.reset_index(
+    #     drop=True)
+    # report_melted_grouped_sorted["Период"] = np.where(report_melted_grouped_sorted['min'] == report_melted_grouped_sorted["max"], 
+    # report_melted_grouped_sorted['max'].dt.strftime('%d.%m.%Y')+": " + report_melted_grouped_sorted['Текст'], 
+    # report_melted_grouped_sorted['min'].dt.strftime('%d.%m.%Y')+' - ' + report_melted_grouped_sorted['max'].dt.strftime('%d.%m.%Y')+': ' + report_melted_grouped_sorted['Текст'])
+    # report_melted_grouped_concat = report_melted_grouped_sorted.groupby(
+    #     'Заказ поставщику.Номер')['Период'].agg(";\n".join).reset_index()
     end = time.perf_counter() 
     print(f"Время работы melt: {end - start:.4f} сек")
-    return report_melted_grouped_concat
+    return report_melted_gr_concat
 
 
 def LWReport(): # функция забирает необходимые столбцы с именами из отчета прошлой недели
