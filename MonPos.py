@@ -7,6 +7,8 @@ import sqlite3
 import os
 
 BASE_DIR= Path(r"C:/Users/Samski/Documents/Мониторинг поставщиков/Выгрузки")
+TRANFORM_DIR=Path(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка')
+TU_DIR=Path(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/Запрос ТУ')
 Sql_Base_dir=Path(r"C:/Users/Samski/metabase-data/MonPos.db")
 
 def read_exel_lwreport():
@@ -20,10 +22,10 @@ def max_comment_prim_date(columns_name): # Вспомогательная фун
         if ('Комментарии ТУ' in i):
             comment_date_str.append(i[-10:].strip())
     comment_date = pd.to_datetime(comment_date_str, format='%d.%m.%Y')
-    comment_date_cur = comment_date.max() + pd.DateOffset(days=7)
+    comment_date_cur = comment_date.max() 
     end = time.perf_counter() 
     print(f"Время работы max_comment_prim_date: {end - start:.4f} сек")
-    return comment_date_cur.strftime('%d.%m.%Y')
+    return comment_date_cur
 
 
 def Avans():# Возвращает таблицу номер заказа - процент аванса
@@ -96,6 +98,7 @@ def LWReport(xlsLWReport): # функция забирает необходим�
             col_primets.append(i)
 
     xlsLWReport = xlsLWReport[col_1]
+   
     end = time.perf_counter() 
     print(f"Время работы lwreport: {end - start:.4f} сек")
     return xlsLWReport
@@ -105,11 +108,11 @@ def UnOtchAvans(avans):# функция рассчитаыает дату пла
     start = time.perf_counter()
     xls = pd.read_excel(BASE_DIR/'6UnOtch.xlsx', sheet_name='Лист_1', skiprows=8)
     xls_avans_1 = avans
-    xls['date_str'] = xls['Регистратор'].str.strip().str.split('от').str[1]
-    xls['date_avans'] = xls['date_str'].str.strip().str.split(' ').str[0]
-
-    xls['date_avans'] = pd.to_datetime(xls['date_avans'], dayfirst=True)
-    xls['Дата пл.док.'] = pd.to_datetime(xls['Дата пл.док.'], dayfirst=True)
+    #xls['date_str'] = xls['Регистратор'].str.strip().str.split('от').str[1]
+    #xls['date_avans'] = xls['date_str'].str.strip().str.split(' ').str[0]
+    xls['date_avans']=xls['Регистратор'].str.extract(r'(\d{2}\.\d{2}\.\d{4})',expand=False)
+    xls['date_avans'] = pd.to_datetime(xls['date_avans'], dayfirst=True,errors='coerce')
+    xls['Дата пл.док.'] = pd.to_datetime(xls['Дата пл.док.'], dayfirst=True,errors='coerce')
     xls['Дата пл.док.'] = xls['Дата пл.док.'].fillna(xls['date_avans'])
 
     xls = xls.sort_values(['Заказ поставщику.Номер', 'date_avans'])
@@ -142,12 +145,12 @@ def UO(): # Функция возвращает дату последнего у
     xls = pd.read_excel(BASE_DIR/'1UO.xlsx', sheet_name='Лист_1', skiprows=7)
     xls_drop = xls[~xls['Заказ поставщику'].isna()].reset_index(drop=True)
     xls_drop = xls_drop.iloc[:-1]
-    xls_drop['Заказ поставщику'] = xls_drop['Заказ поставщику'].str[29:40]
-    xls_drop['Тип уведомления'] = xls_drop['Уведомление от поставщика'].str[:22].str.strip()
-    xls_drop['Дата'] = xls_drop['Уведомление от поставщика'].str[64:75].str.strip()
+    xls_drop['Заказ поставщику'] = xls_drop['Заказ поставщику'].str.extract(r'(СК00\d{7})',expand=False)
+    xls_drop['Тип уведомления'] = xls_drop['Уведомление от поставщика'].str.extract(r'(Извещение о готовности|Извещение об отгрузке)',expand=False)
+    xls_drop['Дата'] = xls_drop['Уведомление от поставщика'].str.extract(r'(\d{2}\.\d{2}\.\d{4})',expand=False)
     xls_drop = xls_drop[(xls_drop['Тип уведомления'] == 'Извещение об отгрузке') | (
         xls_drop['Тип уведомления'] == 'Извещение о готовности')]
-    xls_drop['Дата'] = pd.to_datetime(xls_drop['Дата'], dayfirst=True)
+    xls_drop['Дата'] = pd.to_datetime(xls_drop['Дата'], dayfirst=True, errors="coerce")
     xls_drop_gr = xls_drop.groupby(['Заказ поставщику', 'Тип уведомления'])[
         'Дата'].max().reset_index()
 
@@ -227,7 +230,7 @@ def Escuz_final(): # Финальный этап сборки отчета
     LastDatePayAvansUgo = pd.merge(
         LastDatePayAvans, UGO, left_on='Заказ поставщику.Номер', right_on='Заказ поставщику', how='left')
     LastDatePayAvansUgoUo = pd.merge(
-        LastDatePayAvansUgo, UOO, left_on='Заказ поставщику.Номер', right_on='Заказ поставщику', how='left')
+        LastDatePayAvansUgo, UOO, left_on='Заказ поставщику.Номер', right_on='Заказ поставщику', how='left',suffixes=('_УГО','_УОО'))
     LastDatePayAvansUgoUoAvans = pd.merge(
         LastDatePayAvansUgoUo, MO_avanse, left_on='Заказ поставщику.Номер', right_on='Номер заказа поставщику', how='left')
 
@@ -250,8 +253,8 @@ def Escuz_final(): # Финальный этап сборки отчета
     mask_pros=LastDatePayAvansUgoUoAvans['Расчетная дата отгрузки'] > today 
     LastDatePayAvansUgoUoAvans['Факт просрочки отгрузки'] = np.select(
        [LastDatePayAvansUgoUoAvans['Расчетная дата отгрузки'].isna(),mask_pros], ['Дата платежа отсутствует','Не просрочено'], 'Просрочено')
-    date_cur_comment = max_comment_prim_date(
-        LastDatePayAvansUgoUoAvans.columns)
+    date_cur_comment = (max_comment_prim_date(
+        LastDatePayAvansUgoUoAvans.columns) +pd.DateOffset(days=7)).strftime('%d.%m.%Y')
 
     conditions_prim = [
         LastDatePayAvansUgoUoAvans['Сумма спецификации с НДС'] < 1000000,
@@ -269,7 +272,7 @@ def Escuz_final(): # Финальный этап сборки отчета
         LastDatePayAvansUgoUoAvans['Наличие оплаты']=='Не оплачено',
         LastDatePayAvansUgoUoAvans['Наличие неисполненных обязательств']=='Неисполненные обязательства отвсутсвуют',
         LastDatePayAvansUgoUoAvans['Факт просрочки отгрузки']=='Не просрочено',
-        LastDatePayAvansUgoUoAvans[f"Примечание на {(pd.to_datetime(date_cur_comment,dayfirst=True)-pd.DateOffset(days=7)).strftime('%d.%m.%Y')}"].isin(['Большой процент отгрузки', 'Имеется УГО','Аннулирование потребности','Отгружено (ТВ)','Отгружено','Приостановка объекта строительства','Убрать из реестра. Решение Осипкина А.В.','Убрать. Решение Мантуша'])
+        LastDatePayAvansUgoUoAvans[f"Примечание на {(pd.to_datetime(date_cur_comment,dayfirst=True)-pd.DateOffset(days=7) ).strftime('%d.%m.%Y')}"].isin(['Большой процент отгрузки', 'Имеется УГО','Аннулирование потребности','Отгружено (ТВ)','Отгружено','Приостановка объекта строительства','Убрать из реестра. Решение Осипкина А.В.','Убрать. Решение Мантуша'])
 
 #- pd.DateOffset(days=7)
     ]
@@ -279,9 +282,9 @@ def Escuz_final(): # Финальный этап сборки отчета
 
     
     LastDatePayAvansUgoUoAvans[f"Примечание на {date_cur_comment}"] = np.select(
-        conditions_prim, choices_prim, "")
+        conditions_prim, choices_prim, "Ручная проверка")
 
-    zakaz_empty_prim=LastDatePayAvansUgoUoAvans[f"Примечание на {date_cur_comment}"]==""
+    zakaz_empty_prim=LastDatePayAvansUgoUoAvans[f"Примечание на {date_cur_comment}"].isin(["Ручная проверка",'Запросить ТУ'])
     zakaz_for_melt=LastDatePayAvansUgoUoAvans.loc[zakaz_empty_prim,'Заказ поставщику.Номер']
 
     LWR_prim_concat = LWReport_melt(xlsLWReport,zakaz_for_melt,'Примечание на')
@@ -302,10 +305,11 @@ def Escuz_final(): # Финальный этап сборки отчета
         if ("Примечание на") in i:
             col_prim_columns_name.append(i)
     col_coment_columns_name.insert(0,col_coment_columns_name.pop())
-
+    LastDatePayAvansUgoUoAvans['Дата отчета']=date_cur_comment
     LastDatePayAvansUgoUoAvans = LastDatePayAvansUgoUoAvans.rename(
         columns={"Вина поставщика\nДА/НЕТ акт2": "Вина поставщика ДА/НЕТ акт2"})
     columns_sample = [
+        "Дата отчета",
         "Заказ поставщику.Номер",
         "Объект строительства.Группа",
         "Заказ поставщику.Объект строительства",
@@ -328,12 +332,12 @@ def Escuz_final(): # Финальный этап сборки отчета
         "Количество по спец. ЕНСИ",
         "Количество отгружено в ед. изм. ЕНСИ",
         "Заказ поставщику.Условие поставки",
-        "Дата_y",
+        "Дата_УГО",
         "Срок Доставки",
         "date_avans",
         "Процент отгрузки по условиям спецификации",
         "Процент отгрузки по есцуз",
-        "Дата_x",
+        "Дата_УОО",
         "Расчетная дата отгрузки",
         "Процент авансирования",
         "Неисполненные обязательства",
@@ -364,7 +368,7 @@ if __name__ == '__main__':
     df = Escuz_final()
 
     df.to_excel(
-        r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/отчет для анализа.xlsx')
+        TRANFORM_DIR/'отчет для анализа.xlsx',index=False)
     end = time.perf_counter()
     print(f"Время работы: {end - start:.4f} сек")
 
@@ -381,3 +385,5 @@ if __name__ == '__main__':
     end = time.perf_counter()
     print(f"Время работы: {end - start:.4f} сек")
     os.startfile(r'C:/Users/Samski/Documents/Мониторинг поставщиков/Обработка/отчет для анализа.xlsx')
+
+
